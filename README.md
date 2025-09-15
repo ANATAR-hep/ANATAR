@@ -23,7 +23,9 @@ ANATAR, a Mathematica-based package for computing scattering amplitudes in  QFT.
 Mathematica (>=13.2)  
 FORM (>=4.2)  
 QGRAF 3.6.5  
+
 (Optionals)
+
 Kira 2.3  
 LiteRed
 
