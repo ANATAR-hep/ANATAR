@@ -31,7 +31,7 @@ LiteRed
 
 There are some examples provided in the ANATAR folder : 
 1. Two-loop virtual correction to Higgs production through bottom quark annihilation.
-2. Two-loop real-virtual correction to Higgs production through bottom quark annihilation.
+2. Two-loop double-real correction to Higgs production through bottom quark annihilation.
 3. Two-loop contribution of the chromomagnetic OtG operator to the Higgs production through gluon-fusion.
 
 
