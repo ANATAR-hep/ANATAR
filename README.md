@@ -7,7 +7,7 @@ Pooja Mukherjee [pooja.mukherjee@desy.de]
 Andres Vasquez [avasquez@uni-bonn.de]
 
 # Introduction
-ANATAR, a Mathematica-based package for computing scattering amplitudes in  QFT. For a detailed description of the code please see arXiv:25xx.xxxx . 
+ANATAR, a Mathematica-based package for computing scattering amplitudes in  QFT. For a detailed description of the code please see arXiv:2509.13951. 
 
 # Features
 
