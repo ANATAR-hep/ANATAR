@@ -180,6 +180,20 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
           If[selectamplitudes=!="All" && Head[selectamplitudes[[1]]] === Span, selectamplitudes = selectamplitudes];}];
      
       If[selectamplitudes==="All",   selectamplitudes = {1;;nDiagrams}  ];
+  
+  (* Check if Kinematics are defined by the user, if not they are then generated *)
+
+  If[Head[Kinematics[processName] ] =!= Association,
+  
+        Kine[initial,final,AN$InitialMomenta,AN$FinalMomenta] ];
+
+
+  AN$Kinematics = AN$Kinematics /. {S->SS,T->TT,U->UU};
+   
+   WriteKinematics[outPath,KinematicInvariants,AN$Kinematics];
+
+  (* Change syntax of list of kinematics from FORM to mathematica *)
+  AN$Kinematics = AN$Kinematics /. {Dot[p1_, Power[p2_, a_] ] :> Power[(p1 . p2), a],SS->S,TT->T,UU->U};
 
     (* Generate amplitudes *)
 
@@ -212,21 +226,6 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
 
     AN$CurrentProcessPath = outPath;
 
-  (* Check if Kinematics are defined by the user, if not they are then generated *)
-
-  If[Head[Kinematics[processName] ] =!= Association,
-  
-        Kine[initial,final,AN$InitialMomenta,AN$FinalMomenta]
-
-   ];
-
-
-  AN$Kinematics = AN$Kinematics /. {S->SS,T->TT,U->UU};
-   
-   WriteKinematics[outPath,KinematicInvariants,AN$Kinematics];
-
-  (* Change syntax of list of kinematics from FORM to mathematica *)
-  AN$Kinematics = AN$Kinematics /. {Dot[p1_, Power[p2_, a_] ] :> Power[(p1 . p2), a],SS->S,TT->T,UU->U};
 
   (* Generate substitutions for the GCouplings *)
 
@@ -242,10 +241,11 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
       };
 
   couplingsString = Import[Global`$AnatarPath<>"/Models/"<>modelname<>"/Couplings.frm","String"];
-  couplingsString = StringRiffle[Drop[StringSplit[couplingsString, "\n"], 10], "\n"];
-  couplingsString = "{"<>StringReplace[couplingsString, subsCleaningCouplings]<>"}";
-
-  AN$GCouplings = ToExpression@couplingsString;
+  (*couplingsString = StringRiffle[Drop[StringSplit[couplingsString, "\n"], 10], "\n"];*)
+  couplingsString = StringReplace[couplingsString, subsCleaningCouplings];
+  couplingsString = StringCases[couplingsString,RegularExpression["(?m)\\b([A-Za-z]\\w*)\\s*->\\s*([^,\\n\\r}]+)\\s*(?:,|$)"]
+    -> {"$1"->"$2"}];
+   AN$GCouplings = Flatten@couplingsString/. s_String :> ToExpression[StringTrim[s]];
 
   (* Store the amplitudes to be read by Mathematica *)
 
@@ -552,7 +552,7 @@ transform[input_String] := Module[
 
 PolarizationSimplification[expr_] :=
  Module[{expr1, ListOfDen, Listofnn, SimpDen, Simpofnn, SimpDenSubs,
-   Rulesnn, result, rhskinematics, lhskinematics, sol, eq,final},
+   Rulesnn, result, rhskinematics, lhskinematics, sol, eq,final,invariants},
   expr1 = expr /. AN$Kinematics;
   ListOfDen = DeleteDuplicates@Cases[expr1, Den[a_, b_], Infinity];
   Listofnn =
@@ -583,16 +583,12 @@ PolarizationSimplification[expr_] :=
          Dot[-a_, -b_] :> Dot[a, b] /.
         Dot[-a_, b_] :> -Distribute[Dot[a, b]] /. AN$Kinematics /.
       Dot[a_, b_] :> Dot[b, a] /. AN$Kinematics);
-  sol = Solve[lhskinematics == rhskinematics, S];
-  If[sol === {}, sol=Solve[lhskinematics == rhskinematics, S12]];
-  eq = First[
-     Solve[((Last[AN$Kinematics][[1]])^2 /. AN$Kinematics) ==
-       rhskinematics, First[sol][[1,1]] ]] /. Rule -> Equal;
-  result =
-   FullSimplify[
-    expr1 /. SimpDenSubs /. Rulesnn /. AN$Kinematics /.
-      Dot[a_, b_] :> Dot[b, a] /.
-     AN$Kinematics/.Flag->1, {Assumptions -> eq}];
+  invariants = DeleteDuplicates@Cases[Last /@ (Most@AN$Kinematics), _Symbol, Infinity];
+  If[invariants =!= {}, sol = Solve[lhskinematics == rhskinematics, invariants[[1]]]];
+  If[sol==={{}} , 
+	result = Expand[expr1/.SimpDenSubs/.Rulesnn/.AN$Kinematics /.Dot[a_, b_] :> Dot[b, a]/.AN$Kinematics/.Flag->1], 
+  {eq = First[Solve[((Last[AN$Kinematics][[1]])^2 /. AN$Kinematics) == rhskinematics, First[sol][[1,1]] ]] ;
+  result = Expand[ expr1 /. SimpDenSubs /. Rulesnn /. AN$Kinematics /.  Dot[a_, b_] :> Dot[b, a] /.  AN$Kinematics/.Flag->1/.eq]}];
   Return[result]]
 
 (****************************************************)
@@ -785,7 +781,7 @@ GenerateAmplitudeSquare[AmpOption0_,AmpCOption0_, opts: OptionsPattern[] ]:=Bloc
 
   If[OptionValue[nnVectorSimplification]===True,
       Return[Association[{Process -> process,  Name ->  AmpName,  LoopOrder ->  nLoops + nLoopsC, Kinematics -> AN$Kinematics, Amplitudes -> PolarizationSimplification[Output]}] ],
-      Return[Association[{Process -> process,  Name ->  AmpName,  LoopOrder ->  nLoops + nLoopsC, Kinematics -> AN$Kinematics, Amplitudes -> Output/.Flag->0}] ] ];
+      Return[Association[{Process -> process,  Name ->  AmpName,  LoopOrder ->  nLoops + nLoopsC, Kinematics -> AN$Kinematics, Amplitudes -> Output/.Flag->1}] ] ];
 
    ]
 
