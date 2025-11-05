@@ -550,10 +550,18 @@ transform[input_String] := Module[
 (*     part of polarization sum                     *)
 (****************************************************)
 
+SetAttributes[ReorderDot, HoldAll]
+
+ReorderDot[EXPR_] := ReplaceAll[EXPR, Dot[a___, b_, c___] /; OrderedQ[{b, c}] === False :> ReorderDot[Dot @@ Sort[{a, b, c}] ] ];
+
 PolarizationSimplification[expr_] :=
  Module[{expr1, ListOfDen, Listofnn, SimpDen, Simpofnn, SimpDenSubs,
    Rulesnn, result, rhskinematics, lhskinematics, sol, eq,final,invariants},
   expr1 = expr /. AN$Kinematics;
+
+  (*Ordering of the Dot[,]*)
+  expr1=ReorderDot[expr1];
+
   ListOfDen = DeleteDuplicates@Cases[expr1, Den[a_, b_], Infinity];
   Listofnn =
    DeleteDuplicates@
@@ -586,7 +594,7 @@ PolarizationSimplification[expr_] :=
   invariants = DeleteDuplicates@Cases[Last /@ (Most@AN$Kinematics), _Symbol, Infinity];
   If[invariants =!= {}, sol = Solve[lhskinematics == rhskinematics, invariants[[1]]]];
   If[sol==={{}} , 
-	result = Expand[expr1/.SimpDenSubs/.Rulesnn/.AN$Kinematics /.Dot[a_, b_] :> Dot[b, a]/.AN$Kinematics/.Flag->1], 
+	result = Expand[expr1/.SimpDenSubs/.Rulesnn/.AN$Kinematics /.Dot[a_, b_] :> Dot[b, a]/; !(MatchQ[a, nn] || MatchQ[b, nn])/.AN$Kinematics/.Flag->1], 
   {eq = First[Solve[((Last[AN$Kinematics][[1]])^2 /. AN$Kinematics) == rhskinematics, First[sol][[1,1]] ]] ;
   result = Expand[ expr1 /. SimpDenSubs /. Rulesnn /. AN$Kinematics /.  Dot[a_, b_] :> Dot[b, a] /.  AN$Kinematics/.Flag->1/.eq]}];
   Return[result]]
