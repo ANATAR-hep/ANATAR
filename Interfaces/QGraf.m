@@ -91,7 +91,7 @@ QGDiagrams[model0_,outp_,initial_->final_,options___]:=Block[{style,model=model0
       WriteString[outfile," in= "<>QGin<>" ;\n\n"];
       WriteString[outfile," out= "<>QGout<>" ;\n\n"];
       WriteString[outfile," loops= "<>loops<>" ;\n\n"];
-      WriteString[outfile," loop_momentum= ;"<>"\n\n"];
+      WriteString[outfile," loop_momentum= k;"<>"\n\n"];
       If[qgoptions=="None",WriteString[outfile," options=  ;"<>"\n\n"],WriteString[outfile," options= "<>qgoptions<>" ;\n\n"]];
       If[partition=="None",WriteString[outfile,""],WriteString[outfile," partition= "<>partition<>" ;\n\n"]];
       WriteString[outfile,"% index_offset= 255 ;"<>"\n\n"];

@@ -263,7 +263,7 @@ OpenWrite[outfile];
   WriteString[outfile,".sort\n"];
   WriteString[outfile,"\n"];
   WriteString[outfile,"repeat id im = i_;\n"];
-  WriteString[outfile,"id PolV(p1?,p1?,0,Gluon1?) = 0;\n"];
+  WriteString[outfile,"id PolV(x?,p1?,p1?,0,Gluon1?) = 0;\n"];
   WriteString[outfile,".sort\n"];
   WriteString[outfile,"\n"];
   If[SimplifiedAmplitud===True,
@@ -444,16 +444,16 @@ OpenWrite[outfile];
   WriteString[outfile, ".sort\n"];
   WriteString[outfile,"\n"];
   WriteString[outfile,"repeat id im = i_;\n"];
-  WriteString[outfile,"id PolVC(p1?,p1?,0,Gluon1?) = 0;\n"];
+  WriteString[outfile,"id PolVC(x?,p1?,p1?,0,Gluon1?) = 0;\n"];
   WriteString[outfile,".sort\n"];
   WriteString[outfile,"\n"];
   If[SimplifiedAmplitud===True,
-    WriteString[outfile,"bracket SpinorU, SpinorV, SpinorUbar, SpinorVbar, PolV, Den,GammaM;\n"];
+    WriteString[outfile,"bracket SpinorU, SpinorV, SpinorUbar, SpinorVbar, PolVC, Den,GammaM;\n"];
     WriteString[outfile,"print+s V"<>ToString[nLoops]<>"HC`i';\n"];
     WriteString[outfile,".sort\n\n"];
     WriteString[outfile,"format mathematica;\n"];
     WriteString[outfile,".sort\n\n"];
-    WriteString[outfile,"bracket SpinorU, SpinorV, SpinorUbar, SpinorVbar, PolV, Den, f, fabc,GammaM;\n"];
+    WriteString[outfile,"bracket SpinorU, SpinorV, SpinorUbar, SpinorVbar, PolVC, Den, f, fabc,GammaM;\n"];
     WriteString[outfile,".sort\n"];
     WriteString[outfile,"#write<AmpC_"<>ToString[nLoops]<>".m> \"AN$AmplitudeC['i'] = ( %E )\",  V"<>ToString[nLoops]<>"HC`i';\n"];
     WriteString[outfile,".sort\n\n"];
