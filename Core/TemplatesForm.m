@@ -752,8 +752,11 @@ WriteProjectorsRoutine[AmpPath_,fields_List,nDiagrams_,nDiagrams1_,nDiagrams2_,n
     WriteString[outfile,"#include "<>AmpPath<>"/projectors.frm\n\n"];
     WriteString[outfile,"Cf Projector;\n\n"];
     If[ContainsExactly[Head/@nDiagrams,{Span}],
+
      WriteString[outfile,"#do i = "<>StringDelete[StringReplace[StringReplace[ToString[nDiagrams, InputForm], ";;" -> ","]," " -> ""],{"{", "}"}]"\n"],
-  WriteString[outfile,"#do i = "<>StringReplace[StringReplace[ToString[nDiagrams, InputForm], ";;" -> ",...,"]," " -> ""]"\n"]];
+
+     WriteString[outfile,"#do i = "<>StringReplace[StringReplace[ToString[nDiagrams, InputForm], ";;" -> ",...,"]," " -> ""]"\n"] 
+    ];
     WriteString[outfile,If[Not[AN$GZip],"*",""] <> "#system gunzip <"<>AmpPath<>"/Amp_"<>ToString[nLoops]<>"/V"<>ToString[nLoops]<>"H`i'.sav.gz> Amp_"<>ToString[nLoops]<>"/V"<>ToString[nLoops]<>"H`i'.sav\n"];
     WriteString[outfile,"load "<>AmpPath<>"/Amp_"<>ToString[nLoops]<>"/V"<>ToString[nLoops]<>"H'i'.sav;\n"];
     WriteString[outfile,If[Not[AN$GZip],"*",""] <>  "#system rm Amp_"<>ToString[nLoops]<>"/V"<>ToString[nLoops]<>"H`i'.sav \n"];

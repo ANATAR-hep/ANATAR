@@ -31,8 +31,11 @@ GenerateAmplitude::treeLevelOtoO    = " The one-to-one amplitude has been reques
 GenerateAmplitude::longName         = " OutputName `1` is too long, please use a shorter string."
 GenerateAmplitude::noFORM           = " Mathematica is not able to find the folder where FORM is installed. Please update the 'Environment[\"PATH\"]' with the path to installation folder of FORM via the function SetEnvironment. "
 GenerateAmplitude::diagButNoAmp     = " Diagrams have been generated but not the Amplitudes."
+GenerateAmplitude::NoRecycledAmp    = " The file `1` associated to the amplitude to be recycle was not found. Make sure the process name and loop order are correctly provided."
+GenerateAmplitude::NoAmpsRecycdAmp  = " The diagrams `1` are not contained in the file `2` being imported by RecycleAmplitude."
+GenerateAmplitude::NoAmpsSelect     = " The diagrams `1` are not contained in the file `2`. Check that the amplitudes specified in the option SelectAmplitudes are within the range of produced diagrams."
 
-GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diagramsPath,amplitudesLog,logFile,processName,nLines,QGModel,QGModelPath,in,outh,in2,out2,QGin,QGout,nDiagrams,nDiagrams1,nDiagrams2,nDiagramsPosition,amplitudesRunOutput,optsQGDiagrams,nLoops,ListKinematics,TraceDimension,amplitudesResult,subsCleaningOutput,couplingsString,subsCleaningCouplings,KinematicInvariants,SimplifiedAmplitud,selectamplitudes,ll,ampCouplings,simpRules,gauges,GeneralModelPath,modelfiles,modelname,Loops,undefField},
+GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diagramsPath,amplitudesLog,logFile,processName,nLines,QGModel,QGModelPath,in,outh,in2,out2,QGin,QGout,nDiagrams,nDiagrams1,nDiagrams2,nDiagramsPosition,amplitudesRunOutput,optsQGDiagrams,nLoops,ListKinematics,TraceDimension,amplitudesResult,subsCleaningOutput,couplingsString,subsCleaningCouplings,KinematicInvariants,SimplifiedAmplitud,selectamplitudes,selectamplitudes0,ll,ampCouplings,simpRules,gauges,GeneralModelPath,modelfiles,modelname,Loops,undefField},
 
   (* Checking if all the arguments are correctly given by the user or not *)
 
@@ -118,12 +121,19 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
 
   ClassifyFieldsFO[AN$allFields];
 
-
-  (* Create Directory of the process *)
-
   outPath=Global`$AnatarPath<>"/Outputs/"<>processName;
 
+  (* Check if Kinematics are defined by the user, if not they are then generated *)
+
+  If[Head[Kinematics[processName] ] =!= Association,
+  
+        Kine[initial,final,AN$InitialMomenta,AN$FinalMomenta] ];
+
+    AN$Kinematics = AN$Kinematics /. {S->SS,T->TT,U->UU};   
+
   If[ Not[OptionValue[RecycleAmplitude] ],
+
+    (* Create Directory of the process *)
 
     If[DirectoryQ[outPath]==False, CreateDirectory[outPath] ];
 
@@ -135,8 +145,13 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
 
   (* CLEAR MasterIntegrals[] and AllTopologies[] whenever GenerateAmplitudes[] is called *)
 
-  AllTopologies[]={};
-  Clear[MasterIntegrals];
+    AllTopologies[]={};
+    Clear[MasterIntegrals];
+
+    WriteKinematics[outPath,KinematicInvariants,AN$Kinematics];
+
+    (* Change syntax of list of kinematics from FORM to mathematica *)
+    AN$Kinematics = AN$Kinematics /. {Dot[p1_, Power[p2_, a_] ] :> Power[(p1 . p2), a],SS->S,TT->T,UU->U};
 
     (* Generate diagrams *)
 
@@ -149,7 +164,7 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
     (* QGDiagrams[QGModel,outPath,initial->final,QGLoops -> OptionValue[QGLoops]] *)
     optsQGDiagrams = FilterRules[{opts}, First /@ Options[QGDiagrams] ];
     QGDiagrams[QGModel,outPath,initial->final, Sequence@@optsQGDiagrams]
-    (* Is this necessary *)
+    
     SetDirectory[outPath];
     
     logFile = Import["diagrams_"<>ToString[nLoops]<>".log", "Words"];
@@ -180,20 +195,6 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
           If[selectamplitudes=!="All" && Head[selectamplitudes[[1]]] === Span, selectamplitudes = selectamplitudes];}];
      
       If[selectamplitudes==="All",   selectamplitudes = {1;;nDiagrams}  ];
-  
-  (* Check if Kinematics are defined by the user, if not they are then generated *)
-
-  If[Head[Kinematics[processName] ] =!= Association,
-  
-        Kine[initial,final,AN$InitialMomenta,AN$FinalMomenta] ];
-
-
-  AN$Kinematics = AN$Kinematics /. {S->SS,T->TT,U->UU};
-   
-   WriteKinematics[outPath,KinematicInvariants,AN$Kinematics];
-
-  (* Change syntax of list of kinematics from FORM to mathematica *)
-  AN$Kinematics = AN$Kinematics /. {Dot[p1_, Power[p2_, a_] ] :> Power[(p1 . p2), a],SS->S,TT->T,UU->U};
 
     (* Generate amplitudes *)
 
@@ -211,16 +212,48 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
     If[amplitudesRunOutput===0, Print["Amplitudes were obtained succesfully and are written in the file "<>MakeGreen[ToString[amplitudesLog] ] ];]
 
 
-    If[amplitudesRunOutput===32512, Message[GenerateAmplitude::noFORM] ],
+    If[amplitudesRunOutput===32512, Message[GenerateAmplitude::noFORM] ];
+    
+    If[ Not@FileExistsQ["Amp_"<>ToString[nLoops]<>".log" ], Message[GenerateAmplitude::diagButNoAmp]&&Abort[] ];
 
-    (* To recycle the amplitude *)
+    amplitudesResult = Import["Amp_"<>ToString[nLoops]<>".m", "String"];
+    
+    selectamplitudes0 = StringCases[amplitudesResult,"AN$Amplitude[" ~~ n : DigitCharacter.. ~~ "]" :> ToExpression[n] ];
+    selectamplitudes = Flatten[selectamplitudes/.s_Span:>Range@@List@@s];
+
+    If[Not@SubsetQ[selectamplitudes0, selectamplitudes], Message[GenerateAmplitude::NoAmpsSelect,Complement[selectamplitudes, selectamplitudes0], "Amp_"<>ToString[nLoops]<>".m" ] ];
+    
+    selectamplitudes = Complement[selectamplitudes, selectamplitudes0];
+    selectamplitudes = Complement[selectamplitudes0, selectamplitudes],
+
+    (* To recycle the amplitude *) 
 
     SetDirectory[outPath];
 
-    logFile = Import["diagrams_"<>ToString[nLoops]<>".log", "Words"];
-    nDiagramsPosition = Position[logFile, "total"] + 2;
-    nDiagrams = ToExpression[(logFile[[#]]&)/@nDiagramsPosition][[1, 1]];
-    selectamplitudes = {1;;nDiagrams}; nDiagrams1=1; nDiagrams2=nDiagrams;
+    If[ Not@FileExistsQ["Amp_"<>ToString[nLoops]<>".m" ], Message[GenerateAmplitude::NoRecycledAmp,"Amp_"<>ToString[nLoops]<>".m"]&&Abort[] ];
+
+    amplitudesResult = Import["Amp_"<>ToString[nLoops]<>".m", "String"];
+
+    selectamplitudes0 = StringCases[amplitudesResult,"AN$Amplitude[" ~~ n : DigitCharacter.. ~~ "]" :> ToExpression[n] ];
+
+    nDiagrams1 = First[selectamplitudes0];
+    nDiagrams2 = Last[selectamplitudes0];
+    nDiagrams = Length[selectamplitudes0];
+
+    selectamplitudes=OptionValue[SelectAmplitudes]; (* Option to select some amplitudes instead of taking all the QGraf diagrams *)
+      If[selectamplitudes=!="All"&&Length[selectamplitudes]=!=1, selectamplitudes = selectamplitudes];
+      If[selectamplitudes=!="All"&&Length[selectamplitudes]==1, 
+         {If[Head[selectamplitudes[[1]]] === Integer, selectamplitudes = {First[selectamplitudes] ;; First[selectamplitudes]}];
+          If[selectamplitudes=!="All" && Head[selectamplitudes[[1]]] === Span, selectamplitudes = selectamplitudes];}];
+
+      selectamplitudes = Flatten[selectamplitudes/.s_Span:>Range@@List@@s];
+
+      If[Not@SubsetQ[selectamplitudes0, selectamplitudes], Message[GenerateAmplitude::NoAmpsRecycdAmp,Complement[selectamplitudes, selectamplitudes0], "Amp_"<>ToString[nLoops]<>".m" ] ];
+     
+      If[selectamplitudes==="All",   selectamplitudes = selectamplitudes0  ];
+
+    (* Change syntax of list of kinematics from FORM to mathematica *)
+    AN$Kinematics = AN$Kinematics /. {Dot[p1_, Power[p2_, a_] ] :> Power[(p1 . p2), a],SS->S,TT->T,UU->U};
 
   ];
 
@@ -241,7 +274,6 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
       };
 
   couplingsString = Import[Global`$AnatarPath<>"/Models/"<>modelname<>"/Couplings.frm","String"];
-  (*couplingsString = StringRiffle[Drop[StringSplit[couplingsString, "\n"], 10], "\n"];*)
   couplingsString = StringReplace[couplingsString, subsCleaningCouplings];
   couplingsString = StringCases[couplingsString,RegularExpression["(?m)\\b([A-Za-z]\\w*)\\s*->\\s*([^,\\n\\r}]+)\\s*(?:,|$)"]
     -> {"$1"->"$2"}];
@@ -271,10 +303,7 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
          "*i_\n":>"*I\n"
          };
         
-
-    If[ Not@FileExistsQ["Amp_"<>ToString[nLoops]<>".log" ], Message[GenerateAmplitude::diagButNoAmp]&&Abort[] ];
-
-  amplitudesResult = Import["Amp_"<>ToString[nLoops]<>".m", "String"];
+    
   amplitudesResult = (StringReplace[#,{"\n"->""," "->"","AN$Amplitude"->"\nAN$Amplitude"}]&)@amplitudesResult;
   amplitudesResult = (StringReplace[#,subsCleaningOutput]&)@amplitudesResult; 
   ll=1;
@@ -286,7 +315,7 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
   amplitudesResult = amplitudesResult /.{D->$DimensionST};
 
 
-  amplitudesResult = Table[DiagramID[i] -> AN$Amplitude[i] , {i, Evaluate[Flatten[List @@ (selectamplitudes) /. Span -> Range]]}]/.{im->I};
+  amplitudesResult = Table[DiagramID[i] -> AN$Amplitude[i] , {i, Evaluate[Flatten[List @@ (selectamplitudes) /. Span -> Range] ]}]/.{im->I};
   
 
   Print[MakeGreen["Done!",Boldmg->True] ];
@@ -294,7 +323,7 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
 
 
   (*** Changed to associations and Claude's convention names ***)
-  Return[Association[{Process -> process, Total -> selectamplitudes, Name ->  processName,  LoopOrder ->  nLoops, Kinematics ->   AN$Kinematics, Amplitudes -> amplitudesResult}] ]
+  Return[Association[{Process -> process, Total -> nDiagrams, Name ->  processName,  LoopOrder ->  nLoops, Kinematics ->   AN$Kinematics, Amplitudes -> amplitudesResult}] ]
 
 
 
@@ -309,7 +338,7 @@ GenerateAmplitude[initial_->final_,opts: OptionsPattern[] ]:=Block[{outPath,diag
 (*  Function that writes the amplitude conjugate  *)
 (**************************************************)
 
-Options[GenerateAmplitudeConjugate] := Join[Options[QGDiagrams], {Model -> "None",OutputName->"None",Dimension -> "None",SimplifiedOutput-> False, Gauges->gaugeDefaultsList, SelectAmplitudes-> "All",SelectCouplingsOrder->"All",SubstitutionRules->"None",PolarizationTrim->False, OffShell->False}]
+Options[GenerateAmplitudeConjugate] := Join[Options[QGDiagrams], {Model -> "None",OutputName->"None",Dimension -> "None",SimplifiedOutput-> False, Gauges->gaugeDefaultsList, SelectAmplitudes-> "All",SelectCouplingsOrder->"All",SubstitutionRules->"None",PolarizationTrim->False, OffShell->False,RecycleAmplitude -> False}]
 
 GenerateAmplitudeConjugate::noModel           = " No model has been specified. Load a model using the option Model of GenerateAmplitude or the function LoadModel.";
 GenerateAmplitudeConjugate::ModelNotFound    = " Model \"`1`\" not found. ";
@@ -321,8 +350,11 @@ GenerateAmplitudeConjugate::InvalidModel      = " InvalidModel:`1`";
 GenerateAmplitudeConjugate::noDiagrams        = " Diagrams not generated, check the file diagrams_`1`.log for more information.";
 GenerateAmplitudeConjugate::noDiagrams2       = " Zero diagrams generated for the given model, fields and selection of coupligns order."
 GenerateAmplitudeConjugate::noFORM           = " Mathematica is not able to find the folder where FORM is installed. Please update the 'Environment[\"PATH\"]' with the path to installation folder of FORM via the function SetEnvironment. "
+GenerateAmplitudeConjugate::NoRecycledAmp    = " The file `1` associated to the amplitude to be recycle was not found. Make sure the process name and loop order are correctly provided."
+GenerateAmplitudeConjugate::NoAmpsRecycdAmp  = " The diagrams `1` are not contained in the file `2` being imported by RecycleAmplitude."
+GenerateAmplitudeConjugate::NoAmpsSelect     = " The diagrams `1` are not contained in the file `2`. Check that the amplitudes specified in the option SelectAmplitudes are within the range of produced diagrams."
 
-GenerateAmplitudeConjugate[initial_->final_, opts: OptionsPattern[] ]:=Block[{outPath,diagramsPath,amplitudesLog,logFile,process,processName,nLines,QGModel,QGModelPath,in,outh,in2,out2,QGin,QGout,nDiagrams,nDiagramsPosition,amplitudesRunOutput,optsQGDiagrams,nLoops,TraceDimension,amplitudesResult,subsCleaningOutput,SimplifiedAmplitud,gauges,selectamplitudes,ampCouplings,simpRules,modelname,GeneralModelPath},
+GenerateAmplitudeConjugate[initial_->final_, opts: OptionsPattern[] ]:=Block[{outPath,diagramsPath,amplitudesLog,logFile,process,processName,nLines,QGModel,QGModelPath,in,outh,in2,out2,QGin,QGout,nDiagrams,nDiagramsPosition,amplitudesRunOutput,optsQGDiagrams,nLoops,TraceDimension,amplitudesResult,subsCleaningOutput,SimplifiedAmplitud,gauges,selectamplitudes,ampCouplings,simpRules,modelname,GeneralModelPath,selectamplitudes0},
 
 (* Checking if all the arguments are correctly given by the user or not *)
 
@@ -375,7 +407,7 @@ GenerateAmplitudeConjugate[initial_->final_, opts: OptionsPattern[] ]:=Block[{ou
   simpRules=OptionValue[SubstitutionRules];
 
   gaugeDefaults = Association[gaugeDefaultsList];
-  gAssoc=Join[gaugeDefaults,toAssoc@OptionValue[Gauges]];
+  gAssoc=Join[gaugeDefaults,toAssoc@OptionValue[Gauges] ];
   gauges=Normal@KeyTake[gAssoc,{"QCD","EW"}];
 
   AN$ExternalMomenta=Array[Symbol["p"<>ToString[#] ]&,Length[initial]+Length[final] ];
@@ -409,61 +441,68 @@ GenerateAmplitudeConjugate[initial_->final_, opts: OptionsPattern[] ]:=Block[{ou
 
   If[DirectoryQ[outPath]==False, CreateDirectory[outPath] ];
 
-  (* Generate diagrams *)
-
-  QGModel = AN$ModelName<>"QG.qgraf";
-  QGModelPath = Global`$AnatarPath<>"/Models/"<>modelname<>"/"<>QGModel;
-  
-  If[DirectoryQ[QGModelPath<>"/"<>QGModel]===False, Run["cp "<>QGModelPath<>" "<>Global`$QGrafPath<>"/"<>QGModel] ];
-
-  optsQGDiagrams = FilterRules[{opts}, First /@ Options[QGDiagrams] ];
-  QGDiagrams[QGModel,outPath,initial->final,Sequence@@optsQGDiagrams];
-
-  SetDirectory[outPath];
-
-  If[DirectoryQ["SaveC_"<>ToString[nLoops] ],DeleteDirectory["SaveC_"<>ToString[nLoops], DeleteContents->True] ];
-  If[FileExistsQ["AmpC_"<>ToString[nLoops]<>".frm"],DeleteFiles["AmpC_"<>ToString[nLoops]<>".frm"] ];
-  If[FileExistsQ["AmpC_"<>ToString[nLoops]<>".log"],DeleteFiles["AmpC_"<>ToString[nLoops]<>".log"] ];
-  If[FileExistsQ["diagrams_" <>ToString[nLoops]<>".log"],DeleteFiles["diagrams_" <>ToString[nLoops]<>".log"] ];
-  If[FileExistsQ[processName<>"_"<>ToString[nLoops] ],DeleteFiles[processName<>"_"<>ToString[nLoops] ] ];
-
-  logFile = Import["diagrams_" <>ToString[nLoops]<>".log", "Words"];
-  nDiagramsPosition = Position[logFile, "total"] + 2;
-  nDiagrams = ToExpression[(logFile[[#]]&)/@nDiagramsPosition][[1, 1]];
-
-  nLines=30;
-  If[!FileExistsQ["Definitions.h"],  WriteDefinitions[outPath,nLines,nDiagrams,TraceDimension,AN$Fields,AN$antiFields,AN$allFields]; ];
+  (* Check if Kinematics are defined by the user, if not they are then generated *)
 
   If[Head[Kinematics[processName] ] =!= Association,
   
-        Kine[initial,final,AN$InitialMomenta,AN$FinalMomenta]
+        Kine[initial,final,AN$InitialMomenta,AN$FinalMomenta] ];
 
-   ];
+    AN$Kinematics = AN$Kinematics /. {S->SS,T->TT,U->UU};  
 
-  AN$Kinematics = AN$Kinematics /. {S->SS,T->TT,U->UU};
-  WriteKinematics[outPath,KinematicInvariants,AN$Kinematics];
-  AN$Kinematics = AN$Kinematics /. {Dot[p1_, Power[p2_, a_] ] :> Power[(p1 . p2), a],SS->S,TT->T,UU->U};
+  SetDirectory[outPath];
 
-  If[Head[nDiagrams]=!=Integer,Message[GenerateAmplitudeConjugate::noDiagrams,nLoops]&&Abort[] ];  
-  If[nDiagrams===0,Message[GenerateAmplitudeConjugate::noDiagrams2 ]&&Return[Null] ];
+  If[ Not[OptionValue[RecycleAmplitude] ],
 
-  TrimAmp=OptionValue[PolarizationTrim]; (* Option to remove the Polarizations *)
-  selectamplitudes=OptionValue[SelectAmplitudes]; (* Option to select some amplitudes instead of taking all the QGraf diagrams *)
-  If[selectamplitudes=!="All"&&Length[selectamplitudes]=!=1, selectamplitudes = selectamplitudes];
-  If[selectamplitudes=!="All"&&Length[selectamplitudes]==1, 
-     {If[Head[selectamplitudes[[1]]] === Integer, selectamplitudes = {First[selectamplitudes] ;; First[selectamplitudes]}];
-      If[selectamplitudes=!="All" && Head[selectamplitudes[[1]]] === Span, selectamplitudes = selectamplitudes];}];
-  If[selectamplitudes==="All", selectamplitudes = {1;;nDiagrams}];
-  (* Generate amplitudes *)
+    (* Create Directory of the process *)
 
-  diagramsPath = outPath<>"/"<>processName<>"_"<>ToString[nLoops];
-  WriteMasterCFO[outPath,nDiagrams,nLoops,diagramsPath,modelname,processName,TraceDimension,SimplifiedAmplitud,TrimAmp,selectamplitudes,ampCouplings,simpRules,gauges];
+    If[DirectoryQ["SaveC_"<>ToString[nLoops] ],DeleteDirectory["SaveC_"<>ToString[nLoops], DeleteContents->True] ];
+    If[FileExistsQ["AmpC_"<>ToString[nLoops]<>".frm"],DeleteFiles["AmpC_"<>ToString[nLoops]<>".frm"] ];
+    If[FileExistsQ["AmpC_"<>ToString[nLoops]<>".log"],DeleteFiles["AmpC_"<>ToString[nLoops]<>".log"] ];
+    If[FileExistsQ["diagrams_" <>ToString[nLoops]<>".log"],DeleteFiles["diagrams_" <>ToString[nLoops]<>".log"] ];
+    If[FileExistsQ[processName<>"_"<>ToString[nLoops] ],DeleteFiles[processName<>"_"<>ToString[nLoops] ] ];
 
-  amplitudesCLog = "AmpC_"<>ToString[nLoops]<>".log";
+    (* Generate diagrams *)
 
-  Print["Computing amplitudes..."];
+    QGModel = AN$ModelName<>"QG.qgraf";
+    QGModelPath = Global`$AnatarPath<>"/Models/"<>modelname<>"/"<>QGModel;
+    
+    If[DirectoryQ[QGModelPath<>"/"<>QGModel]===False, Run["cp "<>QGModelPath<>" "<>Global`$QGrafPath<>"/"<>QGModel] ];
+  
+    optsQGDiagrams = FilterRules[{opts}, First /@ Options[QGDiagrams] ];
+    QGDiagrams[QGModel,outPath,initial->final,Sequence@@optsQGDiagrams];
 
-  amplitudesCRunOutput = Run["form "<>outPath<>"/AmpC_"<>ToString[nLoops]<>".frm > "<>amplitudesCLog];
+    SetDirectory[outPath];
+
+    logFile = Import["diagrams_" <>ToString[nLoops]<>".log", "Words"];
+    nDiagramsPosition = Position[logFile, "total"] + 2;
+    nDiagrams = ToExpression[(logFile[[#]]&)/@nDiagramsPosition][[1, 1]];
+
+    nLines=30;
+    If[!FileExistsQ["Definitions.h"],  WriteDefinitions[outPath,nLines,nDiagrams,TraceDimension,AN$Fields,AN$antiFields,AN$allFields]; ];
+
+    WriteKinematics[outPath,KinematicInvariants,AN$Kinematics];
+    AN$Kinematics = AN$Kinematics /. {Dot[p1_, Power[p2_, a_] ] :> Power[(p1 . p2), a],SS->S,TT->T,UU->U};
+
+    If[Head[nDiagrams]=!=Integer,Message[GenerateAmplitudeConjugate::noDiagrams,nLoops]&&Abort[] ];  
+    If[nDiagrams===0,Message[GenerateAmplitudeConjugate::noDiagrams2 ]&&Return[Null] ];
+
+    TrimAmp=OptionValue[PolarizationTrim]; (* Option to remove the Polarizations *)
+    selectamplitudes=OptionValue[SelectAmplitudes]; (* Option to select some amplitudes instead of taking all the QGraf diagrams *)
+    If[selectamplitudes=!="All"&&Length[selectamplitudes]=!=1, selectamplitudes = selectamplitudes];
+    If[selectamplitudes=!="All"&&Length[selectamplitudes]==1, 
+       {If[Head[selectamplitudes[[1]]] === Integer, selectamplitudes = {First[selectamplitudes] ;; First[selectamplitudes]}];
+        If[selectamplitudes=!="All" && Head[selectamplitudes[[1]]] === Span, selectamplitudes = selectamplitudes];}];
+    If[selectamplitudes==="All", selectamplitudes = {1;;nDiagrams}];
+    (* Generate amplitudes *)
+
+    diagramsPath = outPath<>"/"<>processName<>"_"<>ToString[nLoops];
+    WriteMasterCFO[outPath,nDiagrams,nLoops,diagramsPath,modelname,processName,TraceDimension,SimplifiedAmplitud,TrimAmp,selectamplitudes,ampCouplings,simpRules,gauges];
+
+    amplitudesCLog = "AmpC_"<>ToString[nLoops]<>".log";
+
+    Print["Computing amplitudes..."];
+
+    amplitudesCRunOutput = Run["form "<>outPath<>"/AmpC_"<>ToString[nLoops]<>".frm > "<>amplitudesCLog];
   
     (* If[amplitudesCRunOutput===0, Print[Style["The total number of diagrams generated are "<>ToString[nDiagrams]<>" for the process"<>ToString[process],Bold,Darker@Green ] ]]; *)
 
@@ -473,6 +512,47 @@ GenerateAmplitudeConjugate[initial_->final_, opts: OptionsPattern[] ]:=Block[{ou
 
 
     If[amplitudesRunOutput===32512, Message[GenerateAmplitude::noFORM] ];
+
+    amplitudesResult = Import["AmpC_"<>ToString[nLoops]<>".m", "String"];
+    
+    selectamplitudes0 = StringCases[amplitudesResult,"AN$AmplitudeC[" ~~ n : DigitCharacter.. ~~ "]" :> ToExpression[n] ];
+    selectamplitudes = Flatten[selectamplitudes/.s_Span:>Range@@List@@s];
+
+    If[Not@SubsetQ[selectamplitudes0, selectamplitudes], Message[GenerateAmplitudeConjugate::NoAmpsSelect,Complement[selectamplitudes, selectamplitudes0], "AmpC_"<>ToString[nLoops]<>".m" ] ];
+    
+    selectamplitudes = Complement[selectamplitudes, selectamplitudes0];
+    selectamplitudes = Complement[selectamplitudes0, selectamplitudes],
+
+    (* To recycle the amplitude *) 
+
+    SetDirectory[outPath];
+
+    If[ Not@FileExistsQ["AmpC_"<>ToString[nLoops]<>".m" ], Message[GenerateAmplitudeConjugate::NoRecycledAmp,"AmpC_"<>ToString[nLoops]<>".m"]&&Abort[] ];
+
+    amplitudesResult = Import["AmpC_"<>ToString[nLoops]<>".m", "String"];
+
+    selectamplitudes0 = StringCases[amplitudesResult,"AN$AmplitudeC[" ~~ n : DigitCharacter.. ~~ "]" :> ToExpression[n] ];
+
+    nDiagrams1 = First[selectamplitudes0];
+    nDiagrams2 = Last[selectamplitudes0];
+    nDiagrams = Length[selectamplitudes0];
+
+    selectamplitudes=OptionValue[SelectAmplitudes]; (* Option to select some amplitudes instead of taking all the QGraf diagrams *)
+      If[selectamplitudes=!="All"&&Length[selectamplitudes]=!=1, selectamplitudes = selectamplitudes];
+      If[selectamplitudes=!="All"&&Length[selectamplitudes]==1, 
+         {If[Head[selectamplitudes[[1]]] === Integer, selectamplitudes = {First[selectamplitudes] ;; First[selectamplitudes]}];
+          If[selectamplitudes=!="All" && Head[selectamplitudes[[1]]] === Span, selectamplitudes = selectamplitudes];}];
+
+      selectamplitudes = Flatten[selectamplitudes/.s_Span:>Range@@List@@s];
+
+      If[Not@SubsetQ[selectamplitudes0, selectamplitudes], Message[GenerateAmplitudeConjugate::NoAmpsRecycdAmp,Complement[selectamplitudes, selectamplitudes0], "AmpC_"<>ToString[nLoops]<>".m" ] ];
+     
+      If[selectamplitudes==="All",   selectamplitudes = selectamplitudes0  ];
+
+    (* Change syntax of list of kinematics from FORM to mathematica *)
+    AN$Kinematics = AN$Kinematics /. {Dot[p1_, Power[p2_, a_] ] :> Power[(p1 . p2), a],SS->S,TT->T,UU->U};
+
+  ];
 
 
   subsCleaningOutput={
@@ -498,7 +578,6 @@ GenerateAmplitudeConjugate[initial_->final_, opts: OptionsPattern[] ]:=Block[{ou
 
 
 
-  amplitudesResult = Import["AmpC_"<>ToString[nLoops]<>".m", "String"];
   amplitudesResult = (StringReplace[#,{"\n"->""," "->"","AN$AmplitudeC"->"\nAN$AmplitudeC"}]&)@amplitudesResult;
   amplitudesResult = (StringReplace[#,subsCleaningOutput]&)@amplitudesResult; 
   ll=1;
@@ -516,10 +595,7 @@ GenerateAmplitudeConjugate[initial_->final_, opts: OptionsPattern[] ]:=Block[{ou
   Print[MakeGreen["Done!",Boldmg->True] ];
   nDiagrams = Length[Evaluate[Flatten[List @@ (selectamplitudes) /. Span -> Range] ] ];
 
-
-(*** Changed to associations and Claude's convention names ***)
-
-Return[Association[{Process -> process, Total -> selectamplitudes, Name ->  processName,  LoopOrder ->  nLoops, Kinematics -> AN$Kinematics, Amplitudes -> amplitudesResult}] ]
+  Return[Association[{Process -> process, Total -> nDiagrams, Name ->  processName,  LoopOrder ->  nLoops, Kinematics -> AN$Kinematics, Amplitudes -> amplitudesResult}] ]
 
 ]
 
@@ -597,7 +673,19 @@ PolarizationSimplification[expr_] :=
 	result = Expand[expr1/.SimpDenSubs/.Rulesnn/.AN$Kinematics /.Dot[a_, b_] :> Dot[b, a]/; !(MatchQ[a, nn] || MatchQ[b, nn])/.AN$Kinematics/.Flag->1], 
   {eq = First[Solve[((Last[AN$Kinematics][[1]])^2 /. AN$Kinematics) == rhskinematics, First[sol][[1,1]] ]] ;
   result = Expand[ expr1 /. SimpDenSubs /. Rulesnn /. AN$Kinematics /.  Dot[a_, b_] :> Dot[b, a] /.  AN$Kinematics/.Flag->1/.eq]}];
-  Return[result]]
+  Return[result] ];
+
+listToRanges[list_List] := Module[{groups}, 
+  If[Length[list] == 1, 
+  
+    {First[list] ;; First[list]}, 
+
+    groups = Split[list, #2 == #1 + 1 &];
+    Replace[groups, {{x_} :> x, g_List :> (First[g] ;; Last[g])}, {1}]
+  ]
+];
+
+rangesToList[ranges_List]:=Flatten[ranges/.s_Span:>Range@@List@@s];
 
 (****************************************************)
 (*     Function that writes the amplitude square    *)
@@ -670,6 +758,10 @@ GenerateAmplitudeSquare[AmpOption0_,AmpCOption0_, opts: OptionsPattern[] ]:=Bloc
   nDiagrams   = AmpOption[[2,2]];
   nDiagramsC  = AmpCOption[[2,2]];
 
+  selectamplitudes = AmpOption[[6,2]][[;;,1]]/.{DiagramID[i_]:>i};
+  selectamplitudes = listToRanges[selectamplitudes];
+  selectamplitudesC = AmpCOption[[6,2]][[;;,1]]/.{DiagramID[i_]:>i};
+  selectamplitudesC = listToRanges[selectamplitudesC];
 
    nDiagrams1     =  AmpOption[[6,2]][[1,1]]/.{DiagramID[i_]:>i};
    nDiagrams2     =  AmpOption[[6,2]][[-1,1]]/.{DiagramID[i_]:>i};
@@ -707,7 +799,7 @@ GenerateAmplitudeSquare[AmpOption0_,AmpCOption0_, opts: OptionsPattern[] ]:=Bloc
 
   (* Generate amplitudes square*)
 
-  WriteMasterSqFO[model,AmpPath,AmpCPath,nDiagrams,nDiagramsC,nDiagrams1,nDiagrams2,nDiagramsC1,nDiagramsC2,nLoops,nLoopsC,TraceDimension,overallfactors,casimiroption,simpRules,couplingexpand];
+  WriteMasterSqFO[model,AmpPath,AmpCPath,selectamplitudes,selectamplitudesC,nDiagrams1,nDiagrams2,nDiagramsC1,nDiagramsC2,nLoops,nLoopsC,TraceDimension,overallfactors,casimiroption,simpRules,couplingexpand];
 
   amplitudesSqLog = "AmpSq_"<>ToString[nLoops]<>ToString[nLoopsC]<>".log";
   amplitudesSqRunOutput = Run["form "<>AmpPath<>"/AmpSq_"<>ToString[nLoops]<>ToString[nLoopsC]<>".frm > "<>amplitudesSqLog];
@@ -780,7 +872,7 @@ GenerateAmplitudeSquare[AmpOption0_,AmpCOption0_, opts: OptionsPattern[] ]:=Bloc
         Output = ToExpression[Output]/. {Dot[p1_, Power[p2_, a_] ] :> Power[Dot[p1 , p2], a]}/.AN$Kinematics;
 
 
-        Output = Table[ AN$AmpSq[i,jj], {i, Evaluate[Flatten[List @@ (nDiagrams) /. Span -> Range]]}, {jj,Evaluate[Flatten[List @@ (nDiagramsC) /. Span -> Range]]}];
+        Output = Table[ AN$AmpSq[i,jj], {i, Evaluate[Flatten[List @@ (selectamplitudes) /. Span -> Range] ]}, {jj, Evaluate[Flatten[List @@ (selectamplitudesC) /. Span -> Range] ]}];
         Output = Total[ Output, 2];
         Output = Output/.{D->$DimensionST,im->I}/.{Dot[p1_, Power[p2_, a_] ] :> Power[Dot[p1 , p2], a]};
 

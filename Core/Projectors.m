@@ -109,7 +109,7 @@ ProjectAmplitude::undefProjectors=": The selected projector `1` does not seem to
 
 Options[ProjectAmplitude] := {SubstitutionRules->"None",Projectors->Default,Kinematics->Default,CasimirValues -> False};
 
-ProjectAmplitude[AmpOutput_Association, projectorsByHand_List, opts: OptionsPattern[] ]:=Block[{process,nDiagrams,AmpName,nLoops,extFields,structure,LorentzInd,structureSortRules,amplitudesProjLog,amplitudesProjRunOutput,amplitudesResult,subsCleaningOutput,amplitudeTest,polFactor,polTags,jj,polString,sortedDiagrams,simpRules,subsStructures,SpinInd,ColourInd,MomInd,a1,projectorsList,nProj,output1,ll,subsa1,listNames,GluonInd,projFields,currentProj,kine,finalFields,initialFields,casimiroption},
+ProjectAmplitude[AmpOutput_Association, projectorsByHand_List, opts: OptionsPattern[] ]:=Block[{process,nDiagrams,AmpName,nLoops,extFields,structure,LorentzInd,structureSortRules,amplitudesProjLog,amplitudesProjRunOutput,amplitudesResult,subsCleaningOutput,amplitudeTest,polFactor,polTags,jj,polString,sortedDiagrams,simpRules,subsStructures,SpinInd,ColourInd,MomInd,a1,projectorsList,nProj,output1,ll,subsa1,listNames,GluonInd,projFields,currentProj,kine,finalFields,initialFields,casimiroption,selectamplitudes0},
    Clear[AN$ProjAmplitude]; (* Clean previous run *)
 
    AmpOutputlist  =  ConvertFromAmplitudeAssociation[AmpOutput];
@@ -121,7 +121,9 @@ ProjectAmplitude[AmpOutput_Association, projectorsByHand_List, opts: OptionsPatt
 
    nDiagrams1     =  AmpOutputlist[[6,2]][[1,1]]/.{DiagramID[i_]:>i};
    nDiagrams2     =  AmpOutputlist[[6,2]][[-1,1]]/.{DiagramID[i_]:>i};
-   
+   selectamplitudes0 = AmpOutputlist[[6,2]][[;;,1]]/.{DiagramID[i_]:>i};
+   selectamplitudes0 = listToRanges[selectamplitudes0];
+
    casimiroption = OptionValue[CasimirValues];
 
    AN$ProcessPath=Global`$AnatarPath<>"/Outputs/"<>AmpName;
@@ -240,7 +242,7 @@ ProjectAmplitude[AmpOutput_Association, projectorsByHand_List, opts: OptionsPatt
 
    (* output1 contains the list with the operators used as projectors *)
 
-   WriteProjectorsRoutine[AN$ProcessPath,structure,nDiagrams,nDiagrams1,nDiagrams2,nLoops,D,output1,nProj,simpRules,casimiroption];
+   WriteProjectorsRoutine[AN$ProcessPath,structure,selectamplitudes0,nDiagrams1,nDiagrams2,nLoops,D,output1,nProj,simpRules,casimiroption];
 
    Print["Contracting the amplitudes with the projectors..."];
    amplitudesProjLog=AN$ProcessPath<>"/ProjAmp_"<>ToString[nLoops]<>".log";
@@ -270,6 +272,9 @@ ProjectAmplitude[AmpOutput_Association, projectorsByHand_List, opts: OptionsPatt
 
    amplitudesResult = Import[AN$ProcessPath<>"/Amp_Proj_"<>ToString[nLoops]<>".m", "String"];
    amplitudesResult = (StringReplace[#,subsCleaningOutput]&)@amplitudesResult; 
+
+   nDiagrams = rangesToList[selectamplitudes0];
+   nDiagrams = Length[nDiagrams];
   
    ll=1;
    While[StringContainsQ[amplitudesResult, "_?"] && ll<5, 
@@ -278,16 +283,15 @@ ProjectAmplitude[AmpOutput_Association, projectorsByHand_List, opts: OptionsPatt
         ];
    amplitudesResult = ToExpression[amplitudesResult]/.{Dot[x1_, x2_^2] :> (Dot[ x1 , x2] )^2};
 
-   amplitudesResult = Table[Table[{DiagramID[ii], listNames[[jj]] } -> AN$ProjAmplitude[ii,jj], {ii, Evaluate[Flatten[List @@ (nDiagrams) /. Span -> Range]]}] ,{jj, 1, nProj}];
+   amplitudesResult = Table[Table[{DiagramID[ii], listNames[[jj]] } -> AN$ProjAmplitude[ii,jj], {ii, Evaluate[Flatten[List @@ (selectamplitudes0) /. Span -> Range] ]}] ,{jj, 1, nProj}];
    amplitudesResult = Flatten[amplitudesResult];
 
    amplitudesResult = subsOnShell[amplitudesResult/.{SS->S, TT->T, UU->U}];
 
    amplitudesResult = amplitudesResult/.{D->$DimensionST}/.{Dot[p1_, Power[p2_, a_] ] :> Power[(p1 . p2), a]}/.kine;
    amplitudesResult = amplitudesResult//.{Dot[a_ + b_, c_] :> Dot[a, c] + Dot[b, c], Dot[a_, b_ + c_] :> Dot[a, b] + Dot[a, c], Dot[-a_, b_] :> -Dot[a, b], Dot[a_, -b_] :> -Dot[a, b]};
-
-
-   If[nDiagrams===1, amplitudesResult=Flatten@@@amplitudesResult ];
+   
+   (* If[nDiagrams===1, amplitudesResult=Flatten@@@amplitudesResult ]; *)
 
    Print[MakeGreen["Done!",Boldmg->True] ];
    Return[Association[{Process -> List[process],Total -> nDiagrams, Name ->  AmpName,  LoopOrder ->  nLoops, Projectors -> nProj, Kinematics -> kine, Amplitudes -> amplitudesResult}] ]
