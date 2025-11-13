@@ -33,7 +33,7 @@ Anatar$Version="1.0.2";
 
 
 Print[" - ANATAR - "];
-Print["Version: "<>Anatar$Version<>", (12 Nov 2025)"];
+Print["Version: "<>Anatar$Version<>", (13 Nov 2025)"];
 Print["Authors: C. Duhr, P. Mukherjee, A. Vasquez"];
 Print["Please cite  "];
 Print["https://github.com/ANATAR-hep/ANATAR"];

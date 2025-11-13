@@ -29,7 +29,7 @@ GenerateTopologies::invalidTopology    = "Invalid format of the reference topolo
 
 GenerateTopologies[Amp_, topo_,loopMom_] := 
   Module[{SortedTOPORules, ListofDen, SubTopoInv, SubTopo, ProdDen, 
-    denTotopo, TOPORules, TOPOList, result,ProdDen0,kVars,absRules,signFlipRule},
+    denTotopo, TOPORules, TOPOList, result,ProdDen0,kVars,absRules,signFlipRule, withoutTopInt, withTopInt, finalresult},
 
 
     If[!MemberQ[{Plus, Times}, Head[Amp] ], Message[GenerateTopologies::invalidAmplitude ];Abort[] ]; 
@@ -85,8 +85,11 @@ GenerateTopologies[Amp_, topo_,loopMom_] :=
    SortedTOPORules = SortBy[TOPORules, -Count[#, Den[__], Infinity] &];
 
    result = Expand[Amp] //. SortedTOPORules;
+   withoutTopInt=result /. TopInt[__] -> 0 ;
+   withTopInt = Expand[result - withoutTopInt];
+   finalresult = withTopInt + ( withoutTopInt*TopInt[topo[[1]], Sequence @@ ConstantArray[0, Length[topo[[2]]]]] );
 
-   Return[{SortedTOPORules,result}];
+   Return[{SortedTOPORules,finalresult}];
    ];
 
 (*********************************************)
@@ -189,7 +192,7 @@ FindTopology[amplitude00_Association, opts: OptionsPattern[] ] :=
      If[nProj1 > 1 && AllTrue[amplitude, AllTrue[#, #[[2]] === 0 &] &], Message[FindTopology::noAmplitude, 
      Style["All amplitudes are zero. No topologies can be found", Bold, Darker@Red]] && Abort[]];
      denoAmp = DeleteDuplicates@Select[Flatten@Map[If[Head[Expand[#]] === Plus,(Times@@MultipleDenFunc@(Cases[#, Den[__] | Power[Den[__], _], {0, Infinity}]/.Den[a_, b_]^_. :> Den[a, b])) & /@
-       Level[Expand[#], 1],{Times @@ DeleteDuplicates@MultipleDenFunc@Cases[#, Den[a_, b_]^_. :> Den[a, b], {0, Infinity}]}] &, Cases[amplitude, Rule[{DiagramID[_], _}, rhs_] :> rhs]], # =!= 1 &] }];
+       Level[Expand[#], 1],{Times @@ DeleteDuplicates@MultipleDenFunc@Cases[#, Den[a_, b_]^_. :> Den[a, b], {0, Infinity}]}] &, Cases[amplitude, Rule[{DiagramID[_], _}, rhs_] :> rhs]], # =!= 1 &]}];
 	   
     If[Length[amplitudelist0] == 5, {Print["Finding the topologies for the amplitude square ..."];
      process = amplitudelist0[[1, 2]];
@@ -216,7 +219,7 @@ FindTopology[amplitude00_Association, opts: OptionsPattern[] ] :=
      ProductofDen1 = denoAmp //. transformationRules;
      DenList1 = DenList //. transformationRules;
      masses = Select[Cases[DenList1, Den[a_, b_] :> b, Infinity] // DeleteDuplicates, FreeQ[#, 0] &];
-     list1 = Flatten[List @@ (#), 1] & /@ ProductofDen1;
+     list1 = If[MatchQ[ProductofDen1, {Den[__]}], Flatten[List @ (#), 1] & /@ ProductofDen1, Flatten[List @@ (#), 1] & /@ ProductofDen1];
      If[masses === {}, list2 = SortBy[list1, {-Count[#, _Den]} &],
        list2 = SortBy[list1, {-Count[#, _Den], ((-Count[#, Den[_, masses[[1]]]]))  } &]];
      Table[If[! KeyExistsQ[seen, i], independenttopo =  {list2[[i]]};
@@ -486,13 +489,13 @@ NumeratorToDen[projAmp0_,topology_,loopMomenta_,extMomenta_,  opts: OptionsPatte
    CCicoeff=Join[{CC0},CCicoeff0];
    basisTopoExpl=CC0+Total@Thread[CCicoeff0*topo];
    basisTopoDen=CC0+Total@Thread[CCicoeff0*1/topo0];
-
+   
    invariantsCoeffList=Normal@CoefficientArrays[#,kinvariants]&/@kinvariants;
    basisList=Normal@CoefficientArrays[basisTopoExpl,kinvariants];
-
+   
    Eqs=Flatten/@Table[basisList-invariantsCoeffList[[ii]],{ii,1,Length[invariantsCoeffList]}];
    Eqs=Thread[#==0]&/@Eqs;
-
+   
    CCsolutions=First/@(Solve[#,CCicoeff]&/@Eqs);
    
    subsInvariants=Table[kinvariants[[ii]]->basisTopoDen/.CCsolutions[[ii]],{ii,1,Length[kinvariants]}];
