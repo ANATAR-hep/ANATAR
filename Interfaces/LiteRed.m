@@ -2,7 +2,7 @@
 
 ClearLiteRedFile[tt_] := If[FileExistsQ[Topology[tt][LiteRedFile]],
         DeleteFileIfExistsQ[Topology[tt][LiteRedFile]];
-        KeyDropFrom[Topology[tt], {LiteRedFile,LiteRedTopology}];
+        KeyDropFrom[Topology[tt], {LiteRedFile,LiteRedTopology,LiteRedMIs}];
         ];
 ClearLiteRed[tt__] := ClearLiteRedFile /@ {tt};
 ClearLiteRed[] := ClearLiteRedFile /@ AllTopologies[];
@@ -22,28 +22,31 @@ LiteRed::FileExists = "A LiteRed file already exists for topology `1`. Please ex
 
 Options[RunLiteRed] = {Dimension -> d, AdditionalRules -> {}, FileName -> Automatic, Directory -> Automatic, Save -> True, LiteRedOptions->{LiteRed`SolvejSector -> True},Verbose -> True, Vectors -> {}, Scalars -> {}};
 
-RunLiteRed[name_:All,OptionsPattern[]] := Module[{filename,in,opts,opto,check},
+RunLiteRed[name2:(_List|All), OptionsPattern[] ]:= Module[{opto, name},
 
-   If[Not[CheckForLiteRed[]], Return[$Failed]];
+   name = If[name2 === All, AllTopologies[], name2];
+
+   opto = First/@Options[RunLiteRed];
+   opto = Rule[#,OptionValue[#] ]&/@opto;
+
+   RunLiteRed[#,Sequence@@opto]&/@name;
+];
+
+RunLiteRed[name_,OptionsPattern[]] := Module[{filename,in,opts,opto,check},
+
+   If[Not[CheckForLiteRed[] ], Return[$Failed] ];
       
 
-   If[name === All,
-      name = AllTopologies[]
-      ];
-   If[Head[name] === List,
-      opto = First/@Options[RunLiteRed];
-      opto = Rule[#,OptionValue[#]]& /@ opto;
-      RunLiteRed[#,Sequence@@opto]&/@name
-      ];
-      
-    If[KeyExistsQ[Topology[name]],
+    If[KeyExistsQ[Topology[name] ],
        Message[LiteRed::FileExists,name];
        Return[$Failed]
        ];
-      
+
     If[!MemberQ[AllTopologies[], name],
        Message[LiteRed::NoTopo,name];Return[$Failed]
        ];
+
+
     in = Topology[name];
     If[AssociationQ[in],
        If[KeyExistsQ[in,LiteRedFile],
@@ -63,10 +66,11 @@ RunLiteRed[name_:All,OptionsPattern[]] := Module[{filename,in,opts,opto,check},
    Print[Style["Running LiteRed!", Red]];
    Get[filename];
 
-   If[ValueQ[LiteRed`MIs[name]],
-      Topology[name] = Append[Topology[name], LiteRedMIs -> LiteRed`MIs[name]];
-      Topology[name] = Append[Topology[name], MasterIntegrals -> LiteRed`MIs[name]]
+   If[ValueQ[LiteRed`MIs[CreateLiteRedTopoName[name] ]],
+      Topology[name] = Append[Topology[name], LiteRedMIs -> LiteRed`MIs[CreateLiteRedTopoName[name] ]],
+      Topology[name] = Append[Topology[name], MasterIntegrals -> LiteRed`MIs[CreateLiteRedTopoName[name] ]]
       ];
+
  ]
 
 
