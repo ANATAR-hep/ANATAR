@@ -1,0 +1,2 @@
+For cross-checks with MadGraph, you need to place the modified check_sa.f template in
+MG5_aMC_v2_9_23/madgraph/iolibs/template_files so that random phase-space points are generated every time the standalone output is produced.
